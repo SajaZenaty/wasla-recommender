@@ -21,6 +21,16 @@ RUN pip install -r requirements.txt
 RUN python -c "from sentence_transformers import SentenceTransformer; \
 import os; SentenceTransformer(os.environ['EMBEDDING_MODEL_NAME'])"
 
+# Runtime memory/startup tuning. Set AFTER the build-time model download so the
+# download above can still reach Hugging Face.
+#   TRANSFORMERS_OFFLINE / HF_HUB_OFFLINE: skip network checks at startup (the
+#     model is already baked into the image) to cut memory and time.
+#   OMP_NUM_THREADS=1: avoid spawning per-core OpenMP thread pools (torch/faiss/
+#     scipy), which reduces peak memory under tight container limits.
+ENV TRANSFORMERS_OFFLINE=1 \
+    HF_HUB_OFFLINE=1 \
+    OMP_NUM_THREADS=1
+
 COPY . .
 
 # Snapshot dir — mount a Railway Volume at /data in the service settings.
