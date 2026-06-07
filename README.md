@@ -1,3 +1,13 @@
+---
+title: Wasla Recommender
+emoji: 🔗
+colorFrom: blue
+colorTo: green
+sdk: docker
+app_port: 7860
+pinned: false
+---
+
 # Wasla Recommender
 
 A hybrid recommendation service for a time-banking / skill-sharing platform
