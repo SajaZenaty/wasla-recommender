@@ -2,21 +2,44 @@ import numpy as np
 from datetime import datetime
 from sentence_transformers import SentenceTransformer
 
+from src.settings import (
+    ACTION_WEIGHTS,
+    EMBEDDING_BATCH_SIZE,
+    EMBEDDING_MODEL_NAME,
+    LAMBDA_DECAY,
+)
+
 
 class EmbeddingModel:
     _instance = None
-    
+
     @classmethod
     def get_model(cls):
         if cls._instance is None:
-            cls._instance = SentenceTransformer("paraphrase-multilingual-MiniLM-L12-v2")
+            cls._instance = SentenceTransformer(EMBEDDING_MODEL_NAME)
         return cls._instance
 
-ACTION_WEIGHTS = {"click": 1, "save": 2, "apply": 4}
-LAMBDA_DECAY = 0.05
 
-def embed_batch(texts, batch_size=32):
-  
+def is_zero_vector(vec, eps=1e-8):
+    if vec is None:
+        return True
+    return float(np.linalg.norm(vec)) < eps
+
+
+def get_user_vector(user_vectors, post):
+    """Pick the user representation relevant to a given post.
+
+    An offer ("عرض") is matched against what the user needs (consumer side),
+    while a request ("طلب") is matched against what the user can provide
+    (provider side). This mirrors the category logic in scoring.compute_similarity.
+    """
+    if post.get("post_type") == "عرض":
+        return user_vectors["consumer"]
+    return user_vectors["provider"]
+
+
+def embed_batch(texts, batch_size=EMBEDDING_BATCH_SIZE):
+
     model = EmbeddingModel.get_model()
     return model.encode(texts, batch_size=batch_size, normalize_embeddings=True)
 

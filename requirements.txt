@@ -1,5 +1,15 @@
 pandas>=2.0.0
 numpy>=1.24.0
+scipy>=1.11.0
 scikit-learn>=1.3.0
 sentence-transformers>=2.2.0
-# Optional: faiss-cpu>=1.7.4 (falls back to numpy search if unavailable)
+faiss-cpu>=1.7.4
+fastapi>=0.110.0
+uvicorn[standard]>=0.27.0
+httpx>=0.27.0
+apscheduler>=3.10.0
+pydantic-settings>=2.0.0
+
+# Dev / test
+pytest>=7.4.0
+ruff>=0.4.0

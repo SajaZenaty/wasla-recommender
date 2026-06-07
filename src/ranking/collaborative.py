@@ -2,8 +2,19 @@ import numpy as np
 from scipy.sparse import csr_matrix
 from sklearn.metrics.pairwise import cosine_similarity
 
-ACTION_WEIGHTS = {"click": 1, "save": 2, "apply": 4}
+from src.settings import ACTION_WEIGHTS
 
+
+def compute_item_similarity(matrix):
+    """Item-item cosine similarity from the user x item interaction matrix.
+
+    Returns a sparse (n_items x n_items) matrix so it can be multiplied with a
+    sparse user row and still support ``.toarray()`` downstream.
+    """
+    if matrix.shape[0] == 0 or matrix.shape[1] == 0:
+        n_items = matrix.shape[1]
+        return csr_matrix((n_items, n_items))
+    return cosine_similarity(matrix.T, dense_output=False)
 
 
 def build_interaction_matrix(interactions_df, posts_df):
