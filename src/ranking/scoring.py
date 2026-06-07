@@ -1,18 +1,7 @@
 import numpy as np
 from datetime import datetime
 from src.data.preprocessing import normalize_arabic
-
-
-SCORING_WEIGHTS = {
-    "semantic": 0.35,
-    "retrieval": 0.15,
-    "cf": 0.15,
-    "category": 0.10,
-    "location": 0.08,
-    "time_fit": 0.07,
-    "freshness": 0.05,
-    "trust": 0.05
-}
+from src.settings import SCORING_WEIGHTS, TIME_BALANCE_THRESHOLDS
 
 
 def _normalize_category(value):
@@ -46,8 +35,12 @@ def freshness_score(post):
 
 def compute_time_balance_bias(user, post):
     balance = user.get("time_balance", 0)
-    if balance < 5: return 0.15 if post["post_type"] == "عرض" else -0.05
-    if balance > 20: return 0.15 if post["post_type"] == "طلب" else -0.05
+    bonus = TIME_BALANCE_THRESHOLDS["bonus"]
+    penalty = TIME_BALANCE_THRESHOLDS["penalty"]
+    if balance < TIME_BALANCE_THRESHOLDS["low"]:
+        return bonus if post["post_type"] == "عرض" else penalty
+    if balance > TIME_BALANCE_THRESHOLDS["high"]:
+        return bonus if post["post_type"] == "طلب" else penalty
     return 0.0
 
 def trust_bonus(author_trust, max_trust=5.0):
@@ -70,11 +63,15 @@ def compute_hybrid_score(user, post, user_vec, post_vec, cf_score, retrieval_pri
     
 
     final_score = sum(components[k] * SCORING_WEIGHTS.get(k, 0) for k in components)
-    
-    final_score += compute_time_balance_bias(user, post)
-    
-    breakdown = {k: round(v, 4) for k, v in components.items()}
-    breakdown["balance_bias"] = round(compute_time_balance_bias(user, post), 4)
+
+    balance_bias = compute_time_balance_bias(user, post)
+    final_score += balance_bias
+
+    # Rename keys that would otherwise clobber the post's own "category" and
+    # "location" string columns when the breakdown is merged into the post row.
+    rename = {"category": "category_score", "location": "location_score"}
+    breakdown = {rename.get(k, k): round(v, 4) for k, v in components.items()}
+    breakdown["balance_bias"] = round(balance_bias, 4)
     breakdown["final_score"] = round(final_score, 4)
-    
+
     return final_score, breakdown

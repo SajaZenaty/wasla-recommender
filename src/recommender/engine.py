@@ -7,7 +7,7 @@ from src.features.embeddings import (
     get_user_vector,
     is_zero_vector,
 )
-from recommender.retrieval import (
+from src.recommender.retrieval import (
     build_faiss_index,
     dual_faiss_search,
     normalize_retrieval_scores,
@@ -18,10 +18,7 @@ from src.ranking.collaborative import (
     compute_cf_scores,
 )
 from src.ranking.scoring import compute_hybrid_score, compute_similarity
-
-
-MIN_CANDIDATES = 20
-FAISS_TOP_K = 40
+from src.settings import FAISS_TOP_K, MIN_CANDIDATES
 
 
 def bootstrap_system_data(users_df, posts_df, interactions_df):
