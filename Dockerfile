@@ -24,6 +24,7 @@ import os; SentenceTransformer(os.environ['EMBEDDING_MODEL_NAME'])"
 COPY . .
 
 # Snapshot dir — mount a Railway Volume at /data in the service settings.
-RUN mkdir -p /data
+RUN mkdir -p /data \
+    && chmod +x scripts/entrypoint.sh
 
-CMD uvicorn src.api.app:app --host 0.0.0.0 --port ${PORT:-8000}
+CMD ["scripts/entrypoint.sh"]
