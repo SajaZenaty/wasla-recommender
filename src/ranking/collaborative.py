@@ -2,7 +2,20 @@ import numpy as np
 from scipy.sparse import csr_matrix
 from sklearn.metrics.pairwise import cosine_similarity
 
-ACTION_WEIGHTS = {"click": 1, "save": 2, "apply": 4}
+from src.settings import ACTION_WEIGHTS
+
+
+def compute_item_similarity(matrix):
+    """Item-item cosine similarity from the user x item interaction matrix.
+
+    Returns a sparse (n_items x n_items) matrix so it can be multiplied with a
+    sparse user row and still support ``.toarray()`` downstream.
+    """
+    if matrix.shape[0] == 0 or matrix.shape[1] == 0:
+        n_items = matrix.shape[1]
+        return csr_matrix((n_items, n_items))
+    return cosine_similarity(matrix.T, dense_output=False)
+
 
 def build_interaction_matrix(interactions_df, posts_df):
     users = interactions_df["user_id"].unique()
@@ -19,21 +32,22 @@ def build_interaction_matrix(interactions_df, posts_df):
 
     return matrix, user_index, post_index
 
+
 def compute_cf_scores(user_id, matrix, user_index, idx_to_post_id, similarity):
-   
+
     if user_id not in user_index:
         return {}
 
     user_idx = user_index[user_id]
-    user_vec = matrix[user_idx] 
-    
+    user_vec = matrix[user_idx]
+
     raw_scores = user_vec.dot(similarity).flatten()
 
     if hasattr(user_vec, 'indices'):
         seen = user_vec.indices
     else:
         seen = np.where(user_vec > 0)[0]
-    
+
     raw_scores[seen] = -1
 
     pos_mask = raw_scores > 0
@@ -46,9 +60,3 @@ def compute_cf_scores(user_id, matrix, user_index, idx_to_post_id, similarity):
             pos_scores = (pos_scores - mn) / (mx - mn)
 
     return {idx_to_post_id[i]: float(s) for i, s in zip(pos_indices, pos_scores)}
-
-
-def compute_item_similarity(matrix):
-    if matrix.shape[1] == 0:
-        return np.array([[]])
-    return cosine_similarity(matrix.T)

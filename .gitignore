@@ -1,0 +1,23 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Local config / data
+.env
+/data/
+*.pkl
+
+# Model cache
+.cache/
+models/
+
+# OS / editor
+.DS_Store

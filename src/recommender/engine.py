@@ -12,7 +12,6 @@ from src.features.embeddings import (
     get_user_vector,
     is_zero_vector,
 )
-
 from src.recommender.retrieval import (
     build_faiss_index,
     dual_faiss_search,
@@ -24,6 +23,7 @@ from src.ranking.collaborative import (
     compute_cf_scores,
 )
 from src.ranking.scoring import compute_hybrid_score, compute_similarity
+
 
 def bootstrap_system_data(users_df, posts_df, interactions_df):
     posts_df = posts_df.reset_index(drop=True)
@@ -46,7 +46,7 @@ def bootstrap_system_data(users_df, posts_df, interactions_df):
         "post_embeddings": post_embeddings,
         "post_ids": post_ids,
         "post_id_to_idx": post_id_to_idx,
-        "idx_to_post_id": idx_to_post_id,    
+        "idx_to_post_id": idx_to_post_id,
         "index": index,
         "matrix": matrix,
         "user_index": user_index,
@@ -116,7 +116,7 @@ def recommend(user, posts_df, interactions_df, system_data, top_k=10):
         user_id,
         system_data["matrix"],
         system_data["user_index"],
-        system_data["idx_to_post_id"], 
+        system_data["idx_to_post_id"],
         system_data["similarity"],
     )
 
@@ -150,46 +150,48 @@ def recommend(user, posts_df, interactions_df, system_data, top_k=10):
 
     df_results = pd.DataFrame(results).set_index("post_id")
     df_results = df_results.sort_values(by="final_score", ascending=False)
-    
+
     df_results = apply_diversity(
-        df_results, 
+        df_results,
         system_data["similarity"],
-        system_data["post_id_to_idx"], 
+        system_data["post_id_to_idx"],
         lambda_param=0.5
     )
 
     return df_results.head(top_k).reset_index()
-    
+
+
 def apply_diversity(results, similarity_matrix, post_id_to_idx, lambda_param=0.5):
-    if len(results) < 2: return results
-    
+    if len(results) < 2:
+        return results
+
     df = results.copy()
     selected = []
     candidates = df.index.tolist()
-    
+
     first_idx = candidates[0]
     selected.append(first_idx)
     candidates.remove(first_idx)
-    
+
     while candidates:
         best_candidate = None
         max_mmr = -float('inf')
-        
+
         for cand in candidates:
             score = df.loc[cand, 'final_score']
             cand_idx = post_id_to_idx[cand]
-            
+
             sim_to_selected = max([
                 similarity_matrix[cand_idx, post_id_to_idx[s]] for s in selected
             ])
-            
+
             mmr = lambda_param * score - (1 - lambda_param) * sim_to_selected
-            
+
             if mmr > max_mmr:
                 max_mmr = mmr
                 best_candidate = cand
-        
+
         selected.append(best_candidate)
         candidates.remove(best_candidate)
-        
+
     return df.reindex(selected)
