@@ -3,7 +3,7 @@ import pandas as pd
 from datetime import datetime, timedelta
 
 ACTIONS = ["click", "save", "apply"]
-ACTION_PROBS = [0.6, 0.3, 0.1]
+ACTION_PROBS = [0.5, 0.3, 0.2]
 
 
 def generate_interactions(users_df, posts_df, seed=None):

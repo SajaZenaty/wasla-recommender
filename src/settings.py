@@ -30,3 +30,4 @@ TIME_BALANCE_THRESHOLDS = {
     "bonus": 0.15,
     "penalty": -0.05
 }
+

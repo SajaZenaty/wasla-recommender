@@ -1,19 +1,7 @@
 import numpy as np
 from datetime import datetime
 from src.data.preprocessing import normalize_arabic
-
-
-SCORING_WEIGHTS = {
-    "semantic": 0.35,
-    "retrieval": 0.15,
-    "cf": 0.15,
-    "category": 0.10,
-    "location": 0.08,
-    "time_fit": 0.07,
-    "freshness": 0.05,
-    "trust": 0.05
-}
-
+from src import settings
 
 def _normalize_category(value):
     return normalize_arabic(str(value).lower().strip()) if value else ""
@@ -22,10 +10,14 @@ def compute_similarity(user, post):
     user_skills = {_normalize_category(s) for s in user.get("skills", [])}
     user_needs = {_normalize_category(n) for n in user.get("needs", [])}
     post_category = _normalize_category(post.get("category", ""))
+    post_type = post.get("post_type") 
 
-    if post["post_type"] == "عرض":
-        return 1.0 if post_category in user_needs else 0.2
-    return 1.0 if post_category in user_skills else 0.2
+    if post_type == "عرض":
+        return 1.0 if post_category in user_needs else 0.0
+    elif post_type == "طلب":
+        return 1.0 if post_category in user_skills else 0.0
+    
+    return 0.0
 
 def compute_time_fit(user, post):
     balance = user.get("time_balance", 0)
@@ -46,17 +38,23 @@ def freshness_score(post):
 
 def compute_time_balance_bias(user, post):
     balance = user.get("time_balance", 0)
-    if balance < 5: return 0.15 if post["post_type"] == "عرض" else -0.05
-    if balance > 20: return 0.15 if post["post_type"] == "طلب" else -0.05
+    post_type = post.get("post_type")
+    if balance < 5:
+        return 0.3 if post_type == "طلب" else -0.05
+    
+    elif balance > 20:
+        return 0.3 if post_type == "عرض" else -0.05
+
     return 0.0
 
 def trust_bonus(author_trust, max_trust=5.0):
     return 0.02 * (author_trust / max_trust)
 
 
-def compute_hybrid_score(user, post, user_vec, post_vec, cf_score, retrieval_prior, author_trust):
+from typing import Tuple, Dict
 
-
+def compute_hybrid_score(user: Dict, post: Dict, user_vec, post_vec, cf_score: float, retrieval_prior: float, author_trust: float) -> Tuple[float, Dict]:
+    
     components = {
         "semantic": float(np.dot(user_vec, post_vec)),
         "retrieval": retrieval_prior,
@@ -68,13 +66,12 @@ def compute_hybrid_score(user, post, user_vec, post_vec, cf_score, retrieval_pri
         "trust": trust_bonus(author_trust)
     }
     
-
-    final_score = sum(components[k] * SCORING_WEIGHTS.get(k, 0) for k in components)
+    balance_bias = compute_time_balance_bias(user, post)
     
-    final_score += compute_time_balance_bias(user, post)
+    final_score = sum(components[k] * settings.SCORING_WEIGHTS.get(k, 0) for k in components) + balance_bias
     
     breakdown = {k: round(v, 4) for k, v in components.items()}
-    breakdown["balance_bias"] = round(compute_time_balance_bias(user, post), 4)
+    breakdown["balance_bias"] = round(balance_bias, 4)
     breakdown["final_score"] = round(final_score, 4)
     
     return final_score, breakdown

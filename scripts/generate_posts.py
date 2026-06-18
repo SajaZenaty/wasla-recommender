@@ -37,7 +37,6 @@ def generate_posts(users_df):
 
     for _, user in users_df.iterrows():
 
-        #--------------- Offers ─────────────────────
         for skill in user["skills"]:
             skill_variant = random.choice(category_variants[skill])
 
@@ -58,7 +57,6 @@ def generate_posts(users_df):
 
             post_id += 1
 
-        #------------ Requests ─────────────────────
         for need in user["needs"]:
             need_variant = random.choice(category_variants[need])
 
