@@ -2,6 +2,7 @@ import re
 import pandas as pd
 
 INTERACTION_COLUMNS = ["user_id", "post_id", "action", "timestamp"]
+USER_COLUMNS = ["user_id", "skills", "needs", "location", "time_balance", "trust_score"]
 
 
 def ensure_interactions_schema(interactions_df):
@@ -15,6 +16,15 @@ def ensure_interactions_schema(interactions_df):
     if interactions_df.empty and not set(INTERACTION_COLUMNS).issubset(interactions_df.columns):
         return pd.DataFrame(columns=INTERACTION_COLUMNS)
     return interactions_df
+
+
+def ensure_users_schema(users_df):
+    """Return a users frame with the expected columns (may be empty)."""
+    if users_df is None:
+        return pd.DataFrame(columns=USER_COLUMNS)
+    if users_df.empty and not {"user_id", "skills", "needs"}.issubset(users_df.columns):
+        return pd.DataFrame(columns=USER_COLUMNS)
+    return users_df
 
 
 def _ensure_column(df, column, default):

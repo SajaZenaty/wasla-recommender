@@ -28,10 +28,10 @@ def _coerce_timestamps(df, column):
 
 def frames_from_payload(payload):
     """Build preprocessed (users, posts, interactions) frames from a snapshot."""
-    users_df = pd.DataFrame(payload.get("users", []))
-    posts_df = pd.DataFrame(payload.get("posts", []))
+    users_df = pd.DataFrame(payload.get("users") or [])
+    posts_df = pd.DataFrame(payload.get("posts") or [])
     interactions_df = ensure_interactions_schema(
-        pd.DataFrame(payload.get("interactions", []))
+        pd.DataFrame(payload.get("interactions") or [])
     )
 
     posts_df = _coerce_timestamps(posts_df, "timestamp")
