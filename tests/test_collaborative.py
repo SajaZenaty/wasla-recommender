@@ -16,5 +16,9 @@ def test_empty_interactions_do_not_crash():
 
     assert similarity.shape[0] == similarity.shape[1]
 
-    scores = compute_cf_scores(0, matrix, user_index, post_index, similarity)
+    idx_to_post_id = [None] * len(post_index)
+    for pid, idx in post_index.items():
+        idx_to_post_id[idx] = pid
+
+    scores = compute_cf_scores(0, matrix, user_index, idx_to_post_id, similarity)
     assert scores == {}

@@ -7,8 +7,16 @@ payload shape is also accepted directly by the ``/sync/bootstrap`` endpoint.
 import httpx
 import pandas as pd
 
-from src.data.preprocessing import preprocess_posts, preprocess_users
-from src.utils.validators import validate_posts_data, validate_users_data
+from src.data.preprocessing import (
+    ensure_interactions_schema,
+    preprocess_posts,
+    preprocess_users,
+)
+from src.utils.validators import (
+    validate_interactions_data,
+    validate_posts_data,
+    validate_users_data,
+)
 
 
 def _coerce_timestamps(df, column):
@@ -22,13 +30,16 @@ def frames_from_payload(payload):
     """Build preprocessed (users, posts, interactions) frames from a snapshot."""
     users_df = pd.DataFrame(payload.get("users", []))
     posts_df = pd.DataFrame(payload.get("posts", []))
-    interactions_df = pd.DataFrame(payload.get("interactions", []))
+    interactions_df = ensure_interactions_schema(
+        pd.DataFrame(payload.get("interactions", []))
+    )
 
     posts_df = _coerce_timestamps(posts_df, "timestamp")
     interactions_df = _coerce_timestamps(interactions_df, "timestamp")
 
     validate_users_data(users_df)
     validate_posts_data(posts_df)
+    validate_interactions_data(interactions_df)
 
     return (
         preprocess_users(users_df),

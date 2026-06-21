@@ -10,6 +10,7 @@ from src.settings import (
     EMBEDDING_MODEL_NAME,
     LAMBDA_DECAY,
 )
+from src.utils.ids import filter_by_id, lookup_in_mapping
 
 
 class EmbeddingModel:
@@ -72,21 +73,29 @@ def build_post_embeddings(posts_df):
 
 
 def build_user_interaction_embedding(user_id, interactions_df, post_embeddings, post_id_to_idx):
-    user_interactions = interactions_df[interactions_df["user_id"] == user_id]
+    user_interactions = filter_by_id(interactions_df, "user_id", user_id)
     if user_interactions.empty:
         return None
 
-    post_indices = [post_id_to_idx[pid] for pid in user_interactions["post_id"] if pid in post_id_to_idx]
+    matched_rows = []
+    post_indices = []
+    for _, row in user_interactions.iterrows():
+        idx = lookup_in_mapping(post_id_to_idx, row["post_id"])
+        if idx is not None:
+            matched_rows.append(row)
+            post_indices.append(idx)
+
     if not post_indices:
         return None
 
     vecs = post_embeddings[post_indices]
+    matched = pd.DataFrame(matched_rows)
 
     now = datetime.now()
-    days_diff = (now - pd.to_datetime(user_interactions["timestamp"])).dt.days
+    days_diff = (now - pd.to_datetime(matched["timestamp"])).dt.days
     decay = np.exp(-LAMBDA_DECAY * np.maximum(0, days_diff))
 
-    weights = user_interactions["action"].map(ACTION_WEIGHTS).fillna(1) * decay
+    weights = matched["action"].map(ACTION_WEIGHTS).fillna(1) * decay
 
     avg = np.average(vecs, axis=0, weights=weights)
     norm = np.linalg.norm(avg)

@@ -17,8 +17,13 @@ from datetime import datetime, timezone
 import numpy as np
 import pandas as pd
 
-from src.data.preprocessing import preprocess_posts, preprocess_users
+from src.data.preprocessing import (
+    ensure_interactions_schema,
+    preprocess_posts,
+    preprocess_users,
+)
 from src.recommender.engine import bootstrap_system_data, recommend
+from src.utils.ids import filter_by_id, id_variants, lookup_in_mapping
 
 _BREAKDOWN_KEYS = [
     "semantic",
@@ -92,14 +97,31 @@ class RecommenderState:
     # ------------------------------------------------------------------
     def set_data(self, users_df, posts_df, interactions_df):
         with self._lock:
-            self.users_df = users_df.reset_index(drop=True)
-            self.posts_df = posts_df.reset_index(drop=True)
-            self.interactions_df = (
-                interactions_df.reset_index(drop=True)
-                if interactions_df is not None
-                else pd.DataFrame(columns=["user_id", "post_id", "action", "timestamp"])
+            previous = (
+                self.users_df,
+                self.posts_df,
+                self.interactions_df,
+                self.system_data,
+                self._dirty,
+                self.last_bootstrap_at,
             )
-            self._rebuild()
+            try:
+                self.users_df = users_df.reset_index(drop=True)
+                self.posts_df = posts_df.reset_index(drop=True)
+                self.interactions_df = ensure_interactions_schema(interactions_df).reset_index(
+                    drop=True
+                )
+                self._rebuild()
+            except Exception:
+                (
+                    self.users_df,
+                    self.posts_df,
+                    self.interactions_df,
+                    self.system_data,
+                    self._dirty,
+                    self.last_bootstrap_at,
+                ) = previous
+                raise
 
     def _rebuild(self):
         if self.posts_df is None or self.posts_df.empty:
@@ -125,7 +147,8 @@ class RecommenderState:
             if self.posts_df is None:
                 self.posts_df = row
             else:
-                kept = self.posts_df[self.posts_df["post_id"] != post["post_id"]]
+                variants = set(id_variants(post["post_id"]))
+                kept = self.posts_df[~self.posts_df["post_id"].isin(variants)]
                 self.posts_df = pd.concat([kept, row], ignore_index=True)
             self._dirty = True
 
@@ -133,10 +156,10 @@ class RecommenderState:
         with self._lock:
             row = _coerce_timestamps(pd.DataFrame([interaction]), "timestamp")
             if self.interactions_df is None:
-                self.interactions_df = row
+                self.interactions_df = ensure_interactions_schema(row)
             else:
-                self.interactions_df = pd.concat(
-                    [self.interactions_df, row], ignore_index=True
+                self.interactions_df = ensure_interactions_schema(
+                    pd.concat([self.interactions_df, row], ignore_index=True)
                 )
             self._dirty = True
 
@@ -146,7 +169,11 @@ class RecommenderState:
             if self.users_df is None:
                 self.users_df = incoming
             else:
-                incoming_ids = set(incoming["user_id"].tolist())
+                incoming_ids = {
+                    variant
+                    for user_id in incoming["user_id"].tolist()
+                    for variant in id_variants(user_id)
+                }
                 kept = self.users_df[~self.users_df["user_id"].isin(incoming_ids)]
                 self.users_df = pd.concat([kept, incoming], ignore_index=True)
             # User profile changes affect ranking but not the post index; still
@@ -162,9 +189,7 @@ class RecommenderState:
             if not self.ready:
                 return None, "index_not_ready"
 
-            matches = self.users_df[self.users_df["user_id"] == user_id]
-            if matches.empty and isinstance(user_id, str) and user_id.isdigit():
-                matches = self.users_df[self.users_df["user_id"] == int(user_id)]
+            matches = filter_by_id(self.users_df, "user_id", user_id)
             if matches.empty:
                 return None, "user_not_found"
 

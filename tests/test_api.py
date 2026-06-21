@@ -30,6 +30,61 @@ def test_recommend_unknown_user_returns_404(client):
     assert resp.json()["detail"]["error"] == "user_not_found"
 
 
+def test_sync_bootstrap_with_empty_interactions(client):
+    resp = client.post(
+        "/sync/bootstrap",
+        json={
+            "users": [
+                {
+                    "user_id": 1,
+                    "skills": ["برمجة"],
+                    "needs": ["تصميم"],
+                    "location": "غزة",
+                    "time_balance": 10,
+                    "trust_score": 3,
+                }
+            ],
+            "posts": [
+                {
+                    "post_id": 10,
+                    "user_id": 2,
+                    "post_type": "عرض",
+                    "category": "برمجة",
+                    "title": "خدمة برمجة",
+                    "description": "أقدم خدمات برمجة",
+                    "location": "غزة",
+                    "time_credits": 1,
+                }
+            ],
+            "interactions": [],
+        },
+    )
+    assert resp.status_code == 200
+    assert resp.json()["posts"] == 1
+
+    rec = client.post("/recommend", json={"user_id": 1, "top_k": 5})
+    assert rec.status_code == 200
+
+
+def test_recommend_accepts_string_user_id(client):
+    resp = client.post("/recommend", json={"user_id": "0", "top_k": 3})
+    assert resp.status_code == 200
+    assert resp.json()["user_id"] == "0"
+
+
+def test_sync_bootstrap_invalid_payload_returns_400(client):
+    resp = client.post(
+        "/sync/bootstrap",
+        json={
+            "users": [{"user_id": 1, "skills": [], "needs": []}],
+            "posts": [{"post_id": 1, "user_id": 2, "category": "x"}],
+            "interactions": [],
+        },
+    )
+    assert resp.status_code == 400
+    assert resp.json()["detail"]["error"] == "invalid_payload"
+
+
 def test_sync_post_then_recommend_includes_it(client):
     # Create a controlled user and a matching offer, independent of mock RNG.
     user_id = 999_001

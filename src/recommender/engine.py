@@ -3,7 +3,7 @@ import numpy as np
 
 from src.settings import (
     MIN_CANDIDATES,
-    FAISS_TOP_K
+    FAISS_TOP_K,
 )
 
 from src.features.embeddings import (
@@ -23,6 +23,7 @@ from src.ranking.collaborative import (
     compute_cf_scores,
 )
 from src.ranking.scoring import compute_hybrid_score, compute_similarity
+from src.utils.ids import lookup_in_mapping
 
 
 def bootstrap_system_data(users_df, posts_df, interactions_df):
@@ -135,7 +136,9 @@ def recommend(user, posts_df, interactions_df, system_data, top_k=10):
         post_vec = system_data["post_embeddings"][system_data["post_id_to_idx"][post_id]]
 
         cf_s = cf_score_map.get(post_id, 0.0)
-        author_trust = system_data["user_trust_map"].get(post["user_id"], 0.0)
+        author_trust = lookup_in_mapping(
+            system_data["user_trust_map"], post["user_id"], 0.0
+        )
 
         score, breakdown = compute_hybrid_score(
             user, post, user_vec, post_vec, cf_s, retrieval_prior, author_trust
@@ -155,7 +158,7 @@ def recommend(user, posts_df, interactions_df, system_data, top_k=10):
         df_results,
         system_data["similarity"],
         system_data["post_id_to_idx"],
-        lambda_param=0.5
+        lambda_param=0.5,
     )
 
     return df_results.head(top_k).reset_index()
@@ -175,10 +178,10 @@ def apply_diversity(results, similarity_matrix, post_id_to_idx, lambda_param=0.5
 
     while candidates:
         best_candidate = None
-        max_mmr = -float('inf')
+        max_mmr = -float("inf")
 
         for cand in candidates:
-            score = df.loc[cand, 'final_score']
+            score = df.loc[cand, "final_score"]
             cand_idx = post_id_to_idx[cand]
 
             sim_to_selected = max([
