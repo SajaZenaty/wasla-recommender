@@ -3,6 +3,7 @@ from scipy.sparse import csr_matrix
 from sklearn.metrics.pairwise import cosine_similarity
 
 from src.settings import ACTION_WEIGHTS
+from src.utils.ids import lookup_in_mapping
 
 
 def compute_item_similarity(matrix):
@@ -33,11 +34,11 @@ def build_interaction_matrix(interactions_df, posts_df):
     return matrix, user_index, post_index
 
 def compute_cf_scores(user_id, matrix, user_index, post_index, similarity):
-    if user_id not in user_index:
+    user_idx = lookup_in_mapping(user_index, user_id)
+    if user_idx is None:
         return {}
 
-    user_idx = user_index[user_id]
-    user_vec = matrix[user_idx]  
+    user_vec = matrix[user_idx]
     
     raw_scores = user_vec.dot(similarity).toarray().flatten()
 

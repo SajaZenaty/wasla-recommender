@@ -83,6 +83,11 @@ def load_initial_data():
         logger.info("Loaded snapshot from %s", settings.index_snapshot_path)
         return
 
+    if settings.express_internal_url:
+        if do_full_rebuild():
+            return
+        logger.warning("Express bootstrap failed; trying fallback data source")
+
     if settings.use_mock_data:
         from src.data.loader import load_mock_data
 
@@ -91,10 +96,6 @@ def load_initial_data():
         )
         state.set_data(users_df, posts_df, interactions_df)
         logger.info("Bootstrapped from mock data (%d posts)", state.post_count)
-        return
-
-    if settings.express_internal_url:
-        do_full_rebuild()
         return
 
     logger.warning("No data source configured; service starts in not-ready state")
@@ -144,7 +145,9 @@ def require_token(x_internal_token: str | None = Header(default=None)):
     settings = get_settings()
     if not settings.recommender_api_key:
         return  # auth disabled (dev mode)
-    if x_internal_token != settings.recommender_api_key:
+    expected = settings.recommender_api_key.strip()
+    provided = (x_internal_token or "").strip()
+    if provided != expected:
         raise _api_error(401, "unauthorized", "Invalid or missing X-Internal-Token")
 
 
@@ -173,13 +176,23 @@ def recommend_endpoint(req: RecommendRequest, _=Depends(require_token)):
     return {"user_id": req.user_id, "count": len(recs), "recommendations": recs}
 
 
+def _has_inline_payload(req: BootstrapRequest | None) -> bool:
+    if req is None:
+        return False
+    return any(
+        getattr(req, field) is not None for field in ("users", "posts", "interactions")
+    )
+
+
 @app.post("/sync/bootstrap")
 def sync_bootstrap(req: BootstrapRequest | None = None, _=Depends(require_token)):
     settings = get_settings()
-    has_inline = req is not None and req.posts is not None
-    if has_inline:
-        users_df, posts_df, interactions_df = frames_from_payload(req.model_dump())
-        state.set_data(users_df, posts_df, interactions_df)
+    if _has_inline_payload(req):
+        try:
+            users_df, posts_df, interactions_df = frames_from_payload(req.model_dump())
+            state.set_data(users_df, posts_df, interactions_df)
+        except ValueError as exc:
+            raise _api_error(400, "invalid_payload", str(exc)) from exc
         state.save_snapshot(settings.index_snapshot_path)
         return {"status": "ok", "source": "payload", "posts": state.post_count}
 
@@ -191,17 +204,26 @@ def sync_bootstrap(req: BootstrapRequest | None = None, _=Depends(require_token)
 
 @app.post("/sync/post")
 def sync_post(post: PostIn, _=Depends(require_token)):
-    state.upsert_post(post.model_dump())
+    try:
+        state.upsert_post(post.model_dump())
+    except ValueError as exc:
+        raise _api_error(400, "invalid_payload", str(exc)) from exc
     return {"status": "ok", "post_id": post.post_id}
 
 
 @app.post("/sync/interaction")
 def sync_interaction(interaction: InteractionIn, _=Depends(require_token)):
-    state.add_interaction(interaction.model_dump())
+    try:
+        state.add_interaction(interaction.model_dump())
+    except ValueError as exc:
+        raise _api_error(400, "invalid_payload", str(exc)) from exc
     return {"status": "ok"}
 
 
 @app.post("/sync/users")
 def sync_users(req: UsersSyncRequest, _=Depends(require_token)):
-    state.upsert_users([u.model_dump() for u in req.users])
+    try:
+        state.upsert_users([u.model_dump() for u in req.users])
+    except ValueError as exc:
+        raise _api_error(400, "invalid_payload", str(exc)) from exc
     return {"status": "ok", "users": state.user_count}

@@ -19,6 +19,7 @@ from src.ranking.collaborative import (
 )
 from src.ranking.scoring import compute_hybrid_score, compute_similarity
 from src.settings import FAISS_TOP_K, MIN_CANDIDATES
+from src.utils.ids import lookup_in_mapping
 
 
 def bootstrap_system_data(users_df, posts_df, interactions_df):
@@ -31,7 +32,10 @@ def bootstrap_system_data(users_df, posts_df, interactions_df):
     matrix, user_index, post_index = build_interaction_matrix(interactions_df, posts_df)
     similarity = compute_item_similarity(matrix)
 
-    user_trust_map = users_df.set_index("user_id")["trust_score"].to_dict()
+    user_trust_map = {
+        uid: score
+        for uid, score in users_df.set_index("user_id")["trust_score"].to_dict().items()
+    }
     posts_by_id = posts_df.set_index("post_id", drop=False)
 
     return {
@@ -126,7 +130,9 @@ def recommend(user, posts_df, interactions_df, system_data, top_k=10):
         post_vec = system_data["post_embeddings"][system_data["post_id_to_idx"][post_id]]
 
         cf_s = cf_score_map.get(post_id, 0.0)
-        author_trust = system_data["user_trust_map"].get(post["user_id"], 0.0)
+        author_trust = lookup_in_mapping(
+            system_data["user_trust_map"], post["user_id"], 0.0
+        )
 
         score, breakdown = compute_hybrid_score(
             user, post, user_vec, post_vec, cf_s, retrieval_prior, author_trust
