@@ -1,6 +1,7 @@
 import numpy as np
 import pandas as pd
 from datetime import datetime
+from functools import lru_cache
 from sentence_transformers import SentenceTransformer
 
 from src.settings import (
@@ -41,12 +42,15 @@ def get_user_vector(user_vectors, post):
 
 
 def embed_batch(texts, batch_size=EMBEDDING_BATCH_SIZE):
-
     model = EmbeddingModel.get_model()
     return model.encode(texts, batch_size=batch_size, normalize_embeddings=True)
 
-def build_weighted_embedding(items, model):
-  
+
+@lru_cache(maxsize=128)
+def _cached_weighted_embedding(items_tuple):
+    model = EmbeddingModel.get_model()
+    items = list(items_tuple)
+
     if not items:
         return np.zeros(model.get_sentence_embedding_dimension(), dtype=np.float32)
 
@@ -56,8 +60,11 @@ def build_weighted_embedding(items, model):
     return (avg_vec / norm).astype(np.float32) if norm > 0 else avg_vec
 
 
-def build_post_embeddings(posts_df):
+def build_weighted_embedding(items):
+    return _cached_weighted_embedding(tuple(items))
 
+
+def build_post_embeddings(posts_df):
     texts = [
         f"عنوان: {row['title_clean']} وصف: {row['desc_clean']} تصنيف: {row['category']}"
         for _, row in posts_df.iterrows()
@@ -66,7 +73,6 @@ def build_post_embeddings(posts_df):
 
 
 def build_user_interaction_embedding(user_id, interactions_df, post_embeddings, post_id_to_idx):
-
     user_interactions = filter_by_id(interactions_df, "user_id", user_id)
     if user_interactions.empty:
         return None
@@ -86,26 +92,23 @@ def build_user_interaction_embedding(user_id, interactions_df, post_embeddings, 
     matched = pd.DataFrame(matched_rows)
 
     now = datetime.now()
-    days_diff = (now - matched["timestamp"]).dt.days
+    days_diff = (now - pd.to_datetime(matched["timestamp"])).dt.days
     decay = np.exp(-LAMBDA_DECAY * np.maximum(0, days_diff))
 
     weights = matched["action"].map(ACTION_WEIGHTS).fillna(1) * decay
-    
+
     avg = np.average(vecs, axis=0, weights=weights)
     norm = np.linalg.norm(avg)
-    
+
     return (avg / norm).astype(np.float32) if norm > 0 else None
 
 
 def build_user_vectors(user, interactions_df, system_data):
-    
-    model = EmbeddingModel.get_model()
-    
-    vec_needs = build_weighted_embedding(user.get("needs", []), model)
-    vec_offers = build_weighted_embedding(user.get("skills", []), model)
+    vec_needs = build_weighted_embedding(user.get("needs", []))
+    vec_offers = build_weighted_embedding(user.get("skills", []))
 
     interaction_vec = build_user_interaction_embedding(
-        user["user_id"], interactions_df, 
+        user["user_id"], interactions_df,
         system_data["post_embeddings"], system_data["post_id_to_idx"]
     )
 
@@ -117,6 +120,6 @@ def build_user_vectors(user, interactions_df, system_data):
         return base_vec
 
     return {
-        "consumer": combine(vec_needs), 
-        "provider": combine(vec_offers), 
+        "consumer": combine(vec_needs),
+        "provider": combine(vec_offers),
     }

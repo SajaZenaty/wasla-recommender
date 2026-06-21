@@ -33,28 +33,30 @@ def build_interaction_matrix(interactions_df, posts_df):
 
     return matrix, user_index, post_index
 
-def compute_cf_scores(user_id, matrix, user_index, post_index, similarity):
+
+def compute_cf_scores(user_id, matrix, user_index, idx_to_post_id, similarity):
     user_idx = lookup_in_mapping(user_index, user_id)
     if user_idx is None:
         return {}
 
     user_vec = matrix[user_idx]
-    
-    raw_scores = user_vec.dot(similarity).toarray().flatten()
 
-    seen = user_vec.indices 
+    raw_scores = user_vec.dot(similarity).flatten()
+
+    if hasattr(user_vec, "indices"):
+        seen = user_vec.indices
+    else:
+        seen = np.where(user_vec > 0)[0]
+
     raw_scores[seen] = -1
 
-    cf_score_map = {}
-    for pid, idx in post_index.items():
-        if raw_scores[idx] > 0:
-            cf_score_map[pid] = float(raw_scores[idx])
+    pos_mask = raw_scores > 0
+    pos_indices = np.where(pos_mask)[0]
+    pos_scores = raw_scores[pos_indices]
 
-    if cf_score_map:
-        vals = np.array(list(cf_score_map.values()))
-        mn, mx = vals.min(), vals.max()
+    if pos_scores.size > 0:
+        mn, mx = pos_scores.min(), pos_scores.max()
         if mx > mn:
-            for k in cf_score_map:
-                cf_score_map[k] = (cf_score_map[k] - mn) / (mx - mn)
+            pos_scores = (pos_scores - mn) / (mx - mn)
 
-    return cf_score_map
+    return {idx_to_post_id[i]: float(s) for i, s in zip(pos_indices, pos_scores)}

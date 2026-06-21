@@ -19,6 +19,56 @@ def _category_hit(user, row):
     return category in skills
 
 
+def calculate_metrics(recommended, relevant, k=10):
+    """Precision and recall for a single user."""
+    if not relevant:
+        return 0.0, 0.0
+
+    top_k = recommended[:k]
+    intersection = set(top_k) & set(relevant)
+
+    precision = len(intersection) / k
+    recall = len(intersection) / len(relevant)
+
+    return precision, recall
+
+
+def evaluate_precision_recall(users_df, posts_df, interactions_df, system_data, top_k=10):
+    """Precision/recall evaluation using pre-built system data."""
+    precisions = []
+    recalls = []
+
+    ground_truth = interactions_df.groupby("user_id")["post_id"].apply(list).to_dict()
+
+    for _, user_row in users_df.iterrows():
+        user_id = user_row["user_id"]
+        if user_id not in ground_truth:
+            continue
+
+        results = recommend(
+            user=user_row.to_dict(),
+            posts_df=posts_df,
+            interactions_df=interactions_df,
+            system_data=system_data,
+            top_k=top_k
+        )
+
+        if results.empty:
+            continue
+
+        recommended_ids = results["post_id"].tolist()
+        relevant_ids = ground_truth[user_id]
+
+        p, r = calculate_metrics(recommended_ids, relevant_ids, k=top_k)
+        precisions.append(p)
+        recalls.append(r)
+
+    return {
+        "precision": np.mean(precisions) if precisions else 0.0,
+        "recall": np.mean(recalls) if recalls else 0.0
+    }
+
+
 def _evaluate_seed(seed, n_users, top_k):
     users_df, posts_df, interactions_df = load_mock_data(n_users=n_users, seed=seed)
     system_data = bootstrap_system_data(users_df, posts_df, interactions_df)
