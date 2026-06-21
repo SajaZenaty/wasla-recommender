@@ -23,6 +23,7 @@ from src.ranking.collaborative import (
     compute_cf_scores,
 )
 from src.ranking.scoring import compute_hybrid_score, compute_similarity
+from src.data.preprocessing import ensure_users_schema, preprocess_users
 from src.utils.ids import lookup_in_mapping
 
 
@@ -40,7 +41,13 @@ def bootstrap_system_data(users_df, posts_df, interactions_df):
     for pid, idx in post_index.items():
         idx_to_post_id[idx] = pid
 
-    user_trust_map = users_df.set_index("user_id")["trust_score"].to_dict()
+    users_df = ensure_users_schema(users_df)
+    if users_df.empty:
+        user_trust_map = {}
+    else:
+        if "trust_score" not in users_df.columns:
+            users_df = preprocess_users(users_df)
+        user_trust_map = users_df.set_index("user_id")["trust_score"].to_dict()
     posts_by_id = posts_df.set_index("post_id", drop=False)
 
     return {

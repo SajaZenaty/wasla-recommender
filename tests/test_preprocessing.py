@@ -2,13 +2,26 @@ import pandas as pd
 import pytest
 
 from src.data.express_loader import frames_from_payload
-from src.data.preprocessing import INTERACTION_COLUMNS, ensure_interactions_schema, preprocess_posts, preprocess_users
+from src.data.preprocessing import (
+    INTERACTION_COLUMNS,
+    USER_COLUMNS,
+    ensure_interactions_schema,
+    ensure_users_schema,
+    preprocess_posts,
+    preprocess_users,
+)
 from src.utils.validators import validate_interactions_data
 
 
 def test_ensure_interactions_schema_empty_list():
     df = ensure_interactions_schema(pd.DataFrame([]))
     assert list(df.columns) == INTERACTION_COLUMNS
+    assert df.empty
+
+
+def test_ensure_users_schema_none():
+    df = ensure_users_schema(None)
+    assert list(df.columns) == USER_COLUMNS
     assert df.empty
 
 

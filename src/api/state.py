@@ -19,6 +19,7 @@ import pandas as pd
 
 from src.data.preprocessing import (
     ensure_interactions_schema,
+    ensure_users_schema,
     preprocess_posts,
     preprocess_users,
 )
@@ -127,8 +128,10 @@ class RecommenderState:
         if self.posts_df is None or self.posts_df.empty:
             self.system_data = None
         else:
+            users_df = ensure_users_schema(self.users_df)
+            interactions_df = ensure_interactions_schema(self.interactions_df)
             self.system_data = bootstrap_system_data(
-                self.users_df, self.posts_df, self.interactions_df
+                users_df, self.posts_df, interactions_df
             )
         self._dirty = False
         self.last_bootstrap_at = datetime.now(timezone.utc)
@@ -188,6 +191,9 @@ class RecommenderState:
             self._ensure_fresh()
             if not self.ready:
                 return None, "index_not_ready"
+
+            if self.users_df is None or self.users_df.empty:
+                return None, "user_not_found"
 
             matches = filter_by_id(self.users_df, "user_id", user_id)
             if matches.empty:
