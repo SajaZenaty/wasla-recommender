@@ -5,6 +5,7 @@ Endpoints:
     GET  /health            liveness
     GET  /ready             readiness + data status
     POST /recommend         ranked posts for a user
+    POST /search            semantic search over posts
     POST /sync/bootstrap     full rebuild (inline payload or pull from Express)
     POST /sync/post          upsert a single post
     POST /sync/interaction   record an interaction
@@ -25,6 +26,8 @@ from src.api.schemas import (
     PostIn,
     RecommendRequest,
     RecommendResponse,
+    SearchRequest,
+    SearchResponse,
     StatusResponse,
     UsersSyncRequest,
 )
@@ -249,6 +252,7 @@ def root():
             "ready": "/ready",
             "docs": "/docs",
             "recommend": "POST /recommend",
+            "search": "POST /search",
         },
     }
 
@@ -284,6 +288,25 @@ def recommend_endpoint(req: RecommendRequest, _=Depends(require_token)):
         raise _api_error(404, error, f"Unknown user_id: {req.user_id}")
 
     return {"user_id": req.user_id, "count": len(recs), "recommendations": recs}
+
+
+@app.post("/search", response_model=SearchResponse)
+def search_endpoint(req: SearchRequest, _=Depends(require_token)):
+    settings = get_settings()
+    top_k = min(req.top_k or settings.default_top_k, settings.max_top_k)
+    threshold = (
+        req.threshold
+        if req.threshold is not None
+        else settings.default_search_threshold
+    )
+
+    results, error = state.search_for_query(req.query, top_k, threshold)
+    if error == "index_not_ready":
+        raise _api_error(
+            503, error, "Search index is not ready", retry_after=30
+        )
+
+    return {"query": req.query, "count": len(results), "results": results}
 
 
 def _has_inline_payload(req: BootstrapRequest | None) -> bool:

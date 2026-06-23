@@ -246,6 +246,35 @@ class RecommenderState:
                 )
             return recs, None
 
+    def search_for_query(self, query, top_k, threshold):
+        with self._lock:
+            self._ensure_fresh()
+            if not self.ready:
+                return None, "index_not_ready"
+
+            from src.search.search_engine import search_posts
+
+            hits = search_posts(
+                query, self.system_data, top_k=top_k, threshold=threshold
+            )
+            posts_by_id = self.system_data["posts_by_id"]
+            results = []
+            for hit in hits:
+                post = posts_by_id.loc[hit["post_id"]]
+                results.append(
+                    {
+                        "post_id": _native(hit["post_id"]),
+                        "title": str(post.get("title", "")),
+                        "category": str(post.get("category", "")),
+                        "post_type": str(post.get("post_type", "")),
+                        "similarity_score": hit["similarity_score"],
+                        "freshness": hit["freshness"],
+                        "trust": hit["trust"],
+                        "final_score": hit["final_score"],
+                    }
+                )
+            return results, None
+
     # ------------------------------------------------------------------
     # Snapshot persistence
     # ------------------------------------------------------------------
