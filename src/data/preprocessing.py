@@ -2,7 +2,7 @@ import re
 import pandas as pd
 
 INTERACTION_COLUMNS = ["user_id", "post_id", "action", "timestamp"]
-USER_COLUMNS = ["user_id", "skills", "needs", "location", "time_balance", "trust_score"]
+USER_COLUMNS = ["user_id", "skills", "needs", "time_balance", "trust_score"]
 
 
 def ensure_interactions_schema(interactions_df):
@@ -57,16 +57,15 @@ def clean_text_for_transformer(text):
 def preprocess_posts(posts_df):
     df = posts_df.copy()
 
-    _ensure_column(df, "location", "unknown")
+    
     _ensure_column(df, "time_credits", 0)
-    _ensure_column(df, "post_type", "عرض")
+    _ensure_column(df, "post_type", "offer")
     _ensure_column(df, "service_mode", None)
 
     df["desc_clean"] = df["description"].apply(clean_text_for_transformer).fillna("")
     df["title_clean"] = df["title"].apply(clean_text_for_transformer).fillna("")
 
     df["category"] = df["category"].astype(str).str.strip().str.lower().fillna("unknown")
-    df["location"] = df["location"].astype(str).str.strip().str.lower().fillna("unknown")
     df["time_credits"] = pd.to_numeric(df["time_credits"], errors="coerce").fillna(0)
 
     df["full_text"] = (
@@ -81,7 +80,6 @@ def preprocess_posts(posts_df):
 def preprocess_users(users_df):
     df = users_df.copy()
 
-    _ensure_column(df, "location", "unknown")
     _ensure_column(df, "time_balance", 0)
     _ensure_column(df, "trust_score", 0)
 
@@ -91,7 +89,6 @@ def preprocess_users(users_df):
     df["skills"] = df["skills"].apply(lambda lst: [str(x).lower().strip() for x in lst])
     df["needs"] = df["needs"].apply(lambda lst: [str(x).lower().strip() for x in lst])
 
-    df["location"] = df["location"].fillna("unknown").astype(str).str.lower().str.strip()
     df["time_balance"] = pd.to_numeric(df["time_balance"], errors="coerce").fillna(0)
     df["trust_score"] = pd.to_numeric(df["trust_score"], errors="coerce").fillna(0)
 
