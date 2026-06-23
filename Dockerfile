@@ -41,7 +41,8 @@ ENV TRANSFORMERS_OFFLINE=1 \
     OMP_NUM_THREADS=1 \
     USE_MOCK_DATA=true \
     ENABLE_SCHEDULER=false \
-    BOOTSTRAP_ON_START=true
+    BOOTSTRAP_ON_START=true \
+    MOCK_N_USERS=10
 
 # Default snapshot dir (writable by the runtime user). Override with a mounted
 # volume / env var on platforms that offer persistent storage.

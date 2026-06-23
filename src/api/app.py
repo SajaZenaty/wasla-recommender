@@ -113,32 +113,20 @@ def _log_bootstrap_summary(source: str):
         )
 
 
-def _bootstrap_from_mock():
-    from src.data.loader import load_mock_data
-
-    settings = get_settings()
-    try:
-        users_df, posts_df, interactions_df = load_mock_data(
-            n_users=settings.mock_n_users, seed=42
-        )
-        state.set_data(users_df, posts_df, interactions_df)
-    except Exception as exc:  # noqa: BLE001
-        logger.error("Mock bootstrap failed: %s", exc)
-        return False
-    if not _bootstrap_is_usable():
-        logger.error("Mock bootstrap finished but index is still not ready")
-        return False
-    _log_bootstrap_summary("mock")
-    return True
-
-
 def load_initial_data():
     settings = get_settings()
+    express_url = _effective_express_url(settings)
+    logger.info(
+        "Bootstrap config: bootstrap_on_start=%s use_mock_data=%s express_url=%s mock_n_users=%d",
+        settings.bootstrap_on_start,
+        settings.use_mock_data,
+        "set" if express_url else "unset",
+        settings.mock_n_users,
+    )
+
     if not settings.bootstrap_on_start:
         logger.info("Bootstrap on start disabled (BOOTSTRAP_ON_START=false)")
         return
-
-    express_url = _effective_express_url(settings)
 
     if state.load_snapshot(settings.index_snapshot_path):
         if _bootstrap_is_usable():
@@ -158,27 +146,44 @@ def load_initial_data():
             return
         logger.warning("Express bootstrap failed or empty; trying fallback data source")
 
-    if settings.use_mock_data:
-        if _bootstrap_from_mock():
-            return
+    if settings.use_mock_data and _bootstrap_from_mock():
+        return
 
-    if not express_url:
-        logger.warning(
-            "EXPRESS_INTERNAL_URL not set; loading mock data so the service is ready. "
-            "Configure Express and POST /sync/bootstrap for production data."
-        )
-        if _bootstrap_from_mock():
-            return
-    else:
-        logger.warning(
-            "Express bootstrap failed and USE_MOCK_DATA=false; service starts not-ready"
-        )
+    if not express_url and _bootstrap_from_mock():
+        return
+
+    # Last resort: Express misconfigured or mock with too many users (OOM on free tier).
+    logger.warning("Trying emergency mock bootstrap with 10 users")
+    if _bootstrap_from_mock_n(10):
+        return
 
     if not state.ready:
         logger.error(
             "Startup finished with empty index (ready=false). "
-            "Check logs above; set USE_MOCK_DATA=true or fix EXPRESS_INTERNAL_URL export."
+            "On Hugging Face: remove EXPRESS_INTERNAL_URL, set USE_MOCK_DATA=true, "
+            "MOCK_N_USERS=10, then Factory rebuild."
         )
+
+
+def _bootstrap_from_mock_n(n_users: int) -> bool:
+    from src.data.loader import load_mock_data
+
+    try:
+        users_df, posts_df, interactions_df = load_mock_data(n_users=n_users, seed=42)
+        state.set_data(users_df, posts_df, interactions_df)
+    except Exception as exc:  # noqa: BLE001
+        logger.error("Mock bootstrap failed (n_users=%d): %s", n_users, exc)
+        return False
+    if not _bootstrap_is_usable():
+        logger.error("Mock bootstrap finished but index is still not ready (n_users=%d)", n_users)
+        return False
+    _log_bootstrap_summary("mock")
+    return True
+
+
+def _bootstrap_from_mock():
+    settings = get_settings()
+    return _bootstrap_from_mock_n(settings.mock_n_users)
 
 
 def _start_scheduler():
