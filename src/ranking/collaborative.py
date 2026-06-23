@@ -41,7 +41,7 @@ def compute_cf_scores(user_id, matrix, user_index, idx_to_post_id, similarity):
 
     user_vec = matrix[user_idx]
 
-    raw_scores = user_vec.dot(similarity).flatten()
+    raw_scores = user_vec.dot(similarity).toarray().ravel()
 
     if hasattr(user_vec, "indices"):
         seen = user_vec.indices
