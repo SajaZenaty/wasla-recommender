@@ -77,10 +77,14 @@ class RecommenderState:
     def user_count(self):
         return 0 if self.users_df is None else len(self.users_df)
 
+    def can_serve_recommendations(self):
+        return self.ready and self.user_count > 0
+
     def status(self):
         with self._lock:
             return {
                 "ready": self.ready,
+                "can_serve_recommendations": self.can_serve_recommendations(),
                 "model_loaded": self.model_loaded,
                 "posts": self.post_count,
                 "users": self.user_count,
