@@ -36,7 +36,7 @@ def get_user_vector(user_vectors, post):
     while a request ("طلب") is matched against what the user can provide
     (provider side). This mirrors the category logic in scoring.compute_similarity.
     """
-    if post.get("post_type") == "عرض":
+    if post.get("post_type") == "offer":
         return user_vectors["consumer"]
     return user_vectors["provider"]
 
