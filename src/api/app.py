@@ -1,6 +1,7 @@
 """FastAPI service exposing the Wasla recommender.
 
 Endpoints:
+    GET  /                  service info + endpoint links
     GET  /health            liveness
     GET  /ready             readiness + data status
     POST /recommend         ranked posts for a user
@@ -81,6 +82,7 @@ def _bootstrap_is_usable():
 
 
 def _log_bootstrap_summary(source: str):
+    state.data_source = source
     summary = state.status()
     logger.info(
         "Bootstrap complete (%s): users=%d posts=%d interactions=%d can_serve=%s",
@@ -96,6 +98,17 @@ def _log_bootstrap_summary(source: str):
             "(user_not_found). Ensure Express export includes users with matching "
             "user_id values, then POST /sync/bootstrap."
         )
+
+
+def _bootstrap_from_mock():
+    from src.data.loader import load_mock_data
+
+    settings = get_settings()
+    users_df, posts_df, interactions_df = load_mock_data(
+        n_users=settings.mock_n_users, seed=42
+    )
+    state.set_data(users_df, posts_df, interactions_df)
+    _log_bootstrap_summary("mock")
 
 
 def load_initial_data():
@@ -123,16 +136,20 @@ def load_initial_data():
         logger.warning("Express bootstrap failed; trying fallback data source")
 
     if settings.use_mock_data:
-        from src.data.loader import load_mock_data
-
-        users_df, posts_df, interactions_df = load_mock_data(
-            n_users=settings.mock_n_users, seed=42
-        )
-        state.set_data(users_df, posts_df, interactions_df)
-        _log_bootstrap_summary("mock")
+        _bootstrap_from_mock()
         return
 
-    logger.warning("No data source configured; service starts in not-ready state")
+    if not settings.express_internal_url:
+        logger.warning(
+            "EXPRESS_INTERNAL_URL not set; loading mock data so the service is ready. "
+            "Configure Express and POST /sync/bootstrap for production data."
+        )
+        _bootstrap_from_mock()
+        return
+
+    logger.warning(
+        "Express bootstrap failed and USE_MOCK_DATA=false; service starts not-ready"
+    )
 
 
 def _start_scheduler():
@@ -183,6 +200,23 @@ def require_token(x_internal_token: str | None = Header(default=None)):
     provided = (x_internal_token or "").strip()
     if provided != expected:
         raise _api_error(401, "unauthorized", "Invalid or missing X-Internal-Token")
+
+
+@app.get("/")
+def root():
+    summary = state.status()
+    return {
+        "service": "Wasla Recommender",
+        "version": "1.0.0",
+        "ready": summary["ready"],
+        "can_serve_recommendations": summary["can_serve_recommendations"],
+        "endpoints": {
+            "health": "/health",
+            "ready": "/ready",
+            "docs": "/docs",
+            "recommend": "POST /recommend",
+        },
+    }
 
 
 @app.get("/health")

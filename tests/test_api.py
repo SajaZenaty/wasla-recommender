@@ -7,6 +7,15 @@ def test_health(client):
     assert resp.json()["status"] == "ok"
 
 
+def test_root(client):
+    resp = client.get("/")
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["service"] == "Wasla Recommender"
+    assert body["ready"] is True
+    assert body["endpoints"]["health"] == "/health"
+
+
 def test_ready(client):
     resp = client.get("/ready")
     assert resp.status_code == 200
@@ -15,6 +24,8 @@ def test_ready(client):
     assert body["can_serve_recommendations"] is True
     assert body["posts"] > 0
     assert body["users"] > 0
+    assert body["issue"] is None
+    assert body["data_source"] is not None
 
 
 def test_recommend_known_user(client):

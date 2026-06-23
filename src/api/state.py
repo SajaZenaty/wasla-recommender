@@ -64,6 +64,7 @@ class RecommenderState:
         self._dirty = False
         self.last_bootstrap_at = None
         self.model_loaded = False
+        self.data_source: str | None = None
 
     @property
     def ready(self):
@@ -80,6 +81,21 @@ class RecommenderState:
     def can_serve_recommendations(self):
         return self.ready and self.user_count > 0
 
+    def readiness_issue(self):
+        if self.can_serve_recommendations():
+            return None
+        if not self.ready:
+            return (
+                "index_empty: set EXPRESS_INTERNAL_URL and POST /sync/bootstrap, "
+                "or set USE_MOCK_DATA=true"
+            )
+        if self.user_count == 0:
+            return (
+                "users_missing: Express export must include users with matching "
+                "user_id values, then POST /sync/bootstrap"
+            )
+        return None
+
     def status(self):
         with self._lock:
             return {
@@ -95,6 +111,8 @@ class RecommenderState:
                 if self.last_bootstrap_at
                 else None,
                 "pending_rebuild": self._dirty,
+                "data_source": self.data_source,
+                "issue": self.readiness_issue(),
             }
 
     # ------------------------------------------------------------------
