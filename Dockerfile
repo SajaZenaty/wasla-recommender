@@ -38,7 +38,10 @@ import os; SentenceTransformer(os.environ['EMBEDDING_MODEL_NAME'])"
 #     scipy), which reduces peak memory under tight container limits.
 ENV TRANSFORMERS_OFFLINE=1 \
     HF_HUB_OFFLINE=1 \
-    OMP_NUM_THREADS=1
+    OMP_NUM_THREADS=1 \
+    USE_MOCK_DATA=true \
+    ENABLE_SCHEDULER=false \
+    BOOTSTRAP_ON_START=true
 
 # Default snapshot dir (writable by the runtime user). Override with a mounted
 # volume / env var on platforms that offer persistent storage.

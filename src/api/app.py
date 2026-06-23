@@ -53,19 +53,32 @@ def preload_model():
         logger.warning("Could not preload embedding model: %s", exc)
 
 
+def _effective_express_url(settings):
+    url = (settings.express_internal_url or "").strip()
+    return url or None
+
+
 def do_full_rebuild():
     """Pull a fresh snapshot from Express and rebuild, then persist to disk."""
     settings = get_settings()
-    if not settings.express_internal_url:
+    express_url = _effective_express_url(settings)
+    if not express_url:
         logger.warning("Nightly rebuild skipped: EXPRESS_INTERNAL_URL not set")
         return False
     try:
         users_df, posts_df, interactions_df = load_from_express(
-            settings.express_internal_url,
+            express_url,
             api_key=settings.recommender_api_key,
             timeout_ms=settings.express_timeout_ms,
         )
         state.set_data(users_df, posts_df, interactions_df)
+        if not _bootstrap_is_usable():
+            logger.error(
+                "Express export loaded but index is unusable (users=%d, posts=%d)",
+                state.user_count,
+                state.post_count,
+            )
+            return False
         state.save_snapshot(settings.index_snapshot_path)
         logger.info("Full rebuild from Express complete (%d posts)", state.post_count)
         return True
@@ -104,18 +117,28 @@ def _bootstrap_from_mock():
     from src.data.loader import load_mock_data
 
     settings = get_settings()
-    users_df, posts_df, interactions_df = load_mock_data(
-        n_users=settings.mock_n_users, seed=42
-    )
-    state.set_data(users_df, posts_df, interactions_df)
+    try:
+        users_df, posts_df, interactions_df = load_mock_data(
+            n_users=settings.mock_n_users, seed=42
+        )
+        state.set_data(users_df, posts_df, interactions_df)
+    except Exception as exc:  # noqa: BLE001
+        logger.error("Mock bootstrap failed: %s", exc)
+        return False
+    if not _bootstrap_is_usable():
+        logger.error("Mock bootstrap finished but index is still not ready")
+        return False
     _log_bootstrap_summary("mock")
+    return True
 
 
 def load_initial_data():
     settings = get_settings()
     if not settings.bootstrap_on_start:
-        logger.info("Bootstrap on start disabled")
+        logger.info("Bootstrap on start disabled (BOOTSTRAP_ON_START=false)")
         return
+
+    express_url = _effective_express_url(settings)
 
     if state.load_snapshot(settings.index_snapshot_path):
         if _bootstrap_is_usable():
@@ -129,27 +152,33 @@ def load_initial_data():
             state.post_count,
         )
 
-    if settings.express_internal_url:
+    if express_url:
         if do_full_rebuild():
             _log_bootstrap_summary("express")
             return
-        logger.warning("Express bootstrap failed; trying fallback data source")
+        logger.warning("Express bootstrap failed or empty; trying fallback data source")
 
     if settings.use_mock_data:
-        _bootstrap_from_mock()
-        return
+        if _bootstrap_from_mock():
+            return
 
-    if not settings.express_internal_url:
+    if not express_url:
         logger.warning(
             "EXPRESS_INTERNAL_URL not set; loading mock data so the service is ready. "
             "Configure Express and POST /sync/bootstrap for production data."
         )
-        _bootstrap_from_mock()
-        return
+        if _bootstrap_from_mock():
+            return
+    else:
+        logger.warning(
+            "Express bootstrap failed and USE_MOCK_DATA=false; service starts not-ready"
+        )
 
-    logger.warning(
-        "Express bootstrap failed and USE_MOCK_DATA=false; service starts not-ready"
-    )
+    if not state.ready:
+        logger.error(
+            "Startup finished with empty index (ready=false). "
+            "Check logs above; set USE_MOCK_DATA=true or fix EXPRESS_INTERNAL_URL export."
+        )
 
 
 def _start_scheduler():
