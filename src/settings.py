@@ -43,12 +43,11 @@ ACTION_WEIGHTS = {
 LAMBDA_DECAY = _env_float("LAMBDA_DECAY", 0.05)
 
 SCORING_WEIGHTS = {
-    "semantic": _env_float("SCORING_WEIGHT_SEMANTIC", 0.35),
-    "retrieval": _env_float("SCORING_WEIGHT_RETRIEVAL", 0.15),
-    "cf": _env_float("SCORING_WEIGHT_CF", 0.15),
+    "semantic": _env_float("SCORING_WEIGHT_SEMANTIC", 0.40),
+    "retrieval": _env_float("SCORING_WEIGHT_RETRIEVAL", 0.10),
+    "cf": _env_float("SCORING_WEIGHT_CF", 0.25),
     "category": _env_float("SCORING_WEIGHT_CATEGORY", 0.10),
-    "location": _env_float("SCORING_WEIGHT_LOCATION", 0.08),
-    "time_fit": _env_float("SCORING_WEIGHT_TIME_FIT", 0.07),
+    "time_fit": _env_float("SCORING_WEIGHT_TIME_FIT", 0.05),
     "freshness": _env_float("SCORING_WEIGHT_FRESHNESS", 0.05),
     "trust": _env_float("SCORING_WEIGHT_TRUST", 0.05),
 }
