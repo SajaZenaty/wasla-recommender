@@ -12,7 +12,9 @@ def test_ready(client):
     assert resp.status_code == 200
     body = resp.json()
     assert body["ready"] is True
+    assert body["can_serve_recommendations"] is True
     assert body["posts"] > 0
+    assert body["users"] > 0
 
 
 def test_recommend_known_user(client):

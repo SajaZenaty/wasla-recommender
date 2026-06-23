@@ -71,6 +71,7 @@ class StatusResponse(BaseModel):
     model_config = ConfigDict(extra="allow")
 
     ready: bool
+    can_serve_recommendations: bool = False
     model_loaded: bool
     posts: int
     users: int

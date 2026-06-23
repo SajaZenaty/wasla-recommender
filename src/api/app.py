@@ -73,6 +73,31 @@ def do_full_rebuild():
         return False
 
 
+def _bootstrap_is_usable():
+    """True when the loaded index can answer /recommend for known users."""
+    if state.post_count > 0 and state.user_count == 0:
+        return False
+    return state.ready
+
+
+def _log_bootstrap_summary(source: str):
+    summary = state.status()
+    logger.info(
+        "Bootstrap complete (%s): users=%d posts=%d interactions=%d can_serve=%s",
+        source,
+        summary["users"],
+        summary["posts"],
+        summary["interactions"],
+        summary["can_serve_recommendations"],
+    )
+    if summary["ready"] and summary["users"] == 0:
+        logger.error(
+            "Index has posts but zero users — every /recommend will return 404 "
+            "(user_not_found). Ensure Express export includes users with matching "
+            "user_id values, then POST /sync/bootstrap."
+        )
+
+
 def load_initial_data():
     settings = get_settings()
     if not settings.bootstrap_on_start:
@@ -80,11 +105,20 @@ def load_initial_data():
         return
 
     if state.load_snapshot(settings.index_snapshot_path):
-        logger.info("Loaded snapshot from %s", settings.index_snapshot_path)
-        return
+        if _bootstrap_is_usable():
+            logger.info("Loaded snapshot from %s", settings.index_snapshot_path)
+            _log_bootstrap_summary("snapshot")
+            return
+        logger.warning(
+            "Snapshot at %s is unusable (users=%d, posts=%d); re-bootstrapping",
+            settings.index_snapshot_path,
+            state.user_count,
+            state.post_count,
+        )
 
     if settings.express_internal_url:
         if do_full_rebuild():
+            _log_bootstrap_summary("express")
             return
         logger.warning("Express bootstrap failed; trying fallback data source")
 
@@ -95,7 +129,7 @@ def load_initial_data():
             n_users=settings.mock_n_users, seed=42
         )
         state.set_data(users_df, posts_df, interactions_df)
-        logger.info("Bootstrapped from mock data (%d posts)", state.post_count)
+        _log_bootstrap_summary("mock")
         return
 
     logger.warning("No data source configured; service starts in not-ready state")
@@ -171,6 +205,14 @@ def recommend_endpoint(req: RecommendRequest, _=Depends(require_token)):
     if error == "index_not_ready":
         raise _api_error(503, error, "Recommender index is not ready", retry_after=30)
     if error == "user_not_found":
+        summary = state.status()
+        logger.warning(
+            "user_not_found user_id=%r users_indexed=%d posts=%d — "
+            "sync user via POST /sync/users or rebuild via POST /sync/bootstrap",
+            req.user_id,
+            summary["users"],
+            summary["posts"],
+        )
         raise _api_error(404, error, f"Unknown user_id: {req.user_id}")
 
     return {"user_id": req.user_id, "count": len(recs), "recommendations": recs}

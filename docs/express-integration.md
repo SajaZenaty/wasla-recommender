@@ -132,6 +132,27 @@ If the recommender returns `503` (index not ready / rebuilding) or times out,
 Express must serve a fallback feed (chronological or category-based). The
 recommender always keeps serving its last good index during a failed rebuild.
 
+If the recommender returns `404` with `detail.error === "user_not_found"`, the
+user exists in Express but was never synced to the recommender index. Options:
+
+1. **Preferred:** push the profile immediately, then retry once:
+
+```js
+if (err.response?.status === 404 && err.response?.data?.detail?.error === "user_not_found") {
+  await rec.post("/sync/users", { users: [mapUser(user)] }).catch(log);
+  const { data } = await rec.post("/recommend", { user_id: String(userId), top_k: 20 });
+  // ...
+}
+```
+
+2. **Root cause:** ensure `GET /internal/recommender-export` includes all users
+   and that `user_id` matches what you send to `/recommend` (same string/int
+   representation). After fixing export, call `POST /sync/bootstrap` on the
+   recommender.
+
+Check recommender readiness with `GET /ready`: `can_serve_recommendations` must
+be `true` and `users` must be greater than zero.
+
 ## 6. Environment (Express side)
 
 ```
