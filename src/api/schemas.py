@@ -20,6 +20,29 @@ class RecommendResponse(BaseModel):
     recommendations: list[RecommendItem]
 
 
+class SearchRequest(BaseModel):
+    query: str = Field(..., min_length=1)
+    top_k: int | None = Field(default=None, ge=1)
+    threshold: float | None = Field(default=None, ge=0.0, le=1.0)
+
+
+class SearchItem(BaseModel):
+    post_id: int | str
+    title: str
+    category: str
+    post_type: str
+    similarity_score: float
+    freshness: float
+    trust: float
+    final_score: float
+
+
+class SearchResponse(BaseModel):
+    query: str
+    count: int
+    results: list[SearchItem]
+
+
 class PostIn(BaseModel):
     model_config = ConfigDict(extra="allow")
 

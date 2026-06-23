@@ -139,3 +139,31 @@ def test_sync_post_then_recommend_includes_it(client):
     assert resp.status_code == 200
     post_ids = [r["post_id"] for r in resp.json()["recommendations"]]
     assert post_id in post_ids
+
+
+def test_search_returns_results(client):
+    resp = client.post("/search", json={"query": "برمجة", "top_k": 5})
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["query"] == "برمجة"
+    assert body["count"] <= 5
+    for item in body["results"]:
+        assert "post_id" in item
+        assert "title" in item
+        assert "category" in item
+        assert "post_type" in item
+        assert "similarity_score" in item
+        assert "freshness" in item
+        assert "trust" in item
+        assert "final_score" in item
+
+
+def test_search_empty_query_rejected(client):
+    resp = client.post("/search", json={"query": ""})
+    assert resp.status_code == 422
+
+
+def test_search_respects_top_k(client):
+    resp = client.post("/search", json={"query": "برمجة", "top_k": 3})
+    assert resp.status_code == 200
+    assert len(resp.json()["results"]) <= 3

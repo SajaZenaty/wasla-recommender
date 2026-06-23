@@ -32,6 +32,7 @@ class ServiceSettings(BaseSettings):
     # Serving limits
     max_top_k: int = 50
     default_top_k: int = 10
+    default_search_threshold: float = 0.4
 
     log_level: str = "INFO"
 
