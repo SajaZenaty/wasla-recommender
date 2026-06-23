@@ -13,7 +13,7 @@ def compute_similarity(user, post):
     user_needs = {_normalize_category(n) for n in user.get("needs", [])}
     post_category = _normalize_category(post.get("category", ""))
 
-    if post["post_type"] == "عرض":
+    if post["post_type"] == "offer":
         return 1.0 if post_category in user_needs else 0.2
     return 1.0 if post_category in user_skills else 0.2
 
@@ -26,11 +26,6 @@ def compute_time_fit(user, post):
     surplus = balance - cost
     return min(1.0, 0.5 + (surplus / (surplus + 5)))
 
-
-def location_score(user, post):
-    if post.get("service_mode") == "الكتروني":
-        return 1.0
-    return 1.0 if _normalize_category(user.get("location", "")) == _normalize_category(post.get("location", "")) else 0.3
 
 
 def freshness_score(post):
@@ -46,9 +41,9 @@ def compute_time_balance_bias(user, post):
     bonus = TIME_BALANCE_THRESHOLDS["bonus"]
     penalty = TIME_BALANCE_THRESHOLDS["penalty"]
     if balance < TIME_BALANCE_THRESHOLDS["low"]:
-        return bonus if post["post_type"] == "عرض" else penalty
+        return bonus if post["post_type"] == "offer" else penalty
     if balance > TIME_BALANCE_THRESHOLDS["high"]:
-        return bonus if post["post_type"] == "طلب" else penalty
+        return bonus if post["post_type"] == "request" else penalty
     return 0.0
 
 
@@ -63,7 +58,6 @@ def compute_hybrid_score(user, post, user_vec, post_vec, cf_score, retrieval_pri
         "retrieval": retrieval_prior,
         "cf": cf_score,
         "category": compute_similarity(user, post),
-        "location": location_score(user, post),
         "time_fit": compute_time_fit(user, post),
         "freshness": freshness_score(post),
         "trust": trust_bonus(author_trust)
@@ -76,7 +70,7 @@ def compute_hybrid_score(user, post, user_vec, post_vec, cf_score, retrieval_pri
 
     # Rename keys that would otherwise clobber the post's own "category" and
     # "location" string columns when the breakdown is merged into the post row.
-    rename = {"category": "category_score", "location": "location_score"}
+    rename = {"category": "category_score"}
     breakdown = {rename.get(k, k): round(v, 4) for k, v in components.items()}
     breakdown["balance_bias"] = round(balance_bias, 4)
     breakdown["final_score"] = round(final_score, 4)
