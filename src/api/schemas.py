@@ -78,3 +78,5 @@ class StatusResponse(BaseModel):
     interactions: int
     last_bootstrap_at: str | None = None
     pending_rebuild: bool
+    data_source: str | None = None
+    issue: str | None = None
