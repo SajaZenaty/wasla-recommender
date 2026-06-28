@@ -1,6 +1,6 @@
 import numpy as np
 from datetime import datetime
-from src.data.preprocessing import normalize_arabic
+from src.data.preprocessing import is_offer_post, is_request_post, normalize_arabic
 from src.settings import SCORING_WEIGHTS, TIME_BALANCE_THRESHOLDS
 
 
@@ -13,7 +13,7 @@ def compute_similarity(user, post):
     user_needs = {_normalize_category(n) for n in user.get("needs", [])}
     post_category = _normalize_category(post.get("category", ""))
 
-    if post["post_type"] == "offer":
+    if is_offer_post(post["post_type"]):
         return 1.0 if post_category in user_needs else 0.2
     return 1.0 if post_category in user_skills else 0.2
 
@@ -41,9 +41,9 @@ def compute_time_balance_bias(user, post):
     bonus = TIME_BALANCE_THRESHOLDS["bonus"]
     penalty = TIME_BALANCE_THRESHOLDS["penalty"]
     if balance < TIME_BALANCE_THRESHOLDS["low"]:
-        return bonus if post["post_type"] == "offer" else penalty
+        return bonus if is_offer_post(post["post_type"]) else penalty
     if balance > TIME_BALANCE_THRESHOLDS["high"]:
-        return bonus if post["post_type"] == "request" else penalty
+        return bonus if is_request_post(post["post_type"]) else penalty
     return 0.0
 
 

@@ -4,6 +4,17 @@ import pandas as pd
 INTERACTION_COLUMNS = ["user_id", "post_id", "action", "timestamp"]
 USER_COLUMNS = ["user_id", "skills", "needs", "time_balance", "trust_score"]
 
+OFFER_TYPES = frozenset({"offer", "عرض"})
+REQUEST_TYPES = frozenset({"request", "طلب"})
+
+
+def is_offer_post(post_type):
+    return str(post_type).strip() in OFFER_TYPES
+
+
+def is_request_post(post_type):
+    return str(post_type).strip() in REQUEST_TYPES
+
 
 def ensure_interactions_schema(interactions_df):
     """Return an interactions frame with the expected columns.
@@ -59,7 +70,7 @@ def preprocess_posts(posts_df):
 
     
     _ensure_column(df, "time_credits", 0)
-    _ensure_column(df, "post_type", "offer")
+    _ensure_column(df, "post_type", "عرض")
     _ensure_column(df, "service_mode", None)
 
     df["desc_clean"] = df["description"].apply(clean_text_for_transformer).fillna("")
