@@ -32,7 +32,7 @@ EMBEDDING_MODEL_NAME = os.getenv(
 EMBEDDING_BATCH_SIZE = _env_int("EMBEDDING_BATCH_SIZE", 32)
 
 
-FAISS_TOP_K = _env_int("FAISS_TOP_K", 40)
+FAISS_TOP_K = _env_int("FAISS_TOP_K", 100)
 MIN_CANDIDATES = _env_int("MIN_CANDIDATES", 20)
 
 ACTION_WEIGHTS = {
@@ -43,13 +43,13 @@ ACTION_WEIGHTS = {
 LAMBDA_DECAY = _env_float("LAMBDA_DECAY", 0.05)
 
 SCORING_WEIGHTS = {
-    "semantic": _env_float("SCORING_WEIGHT_SEMANTIC", 0.40),
-    "retrieval": _env_float("SCORING_WEIGHT_RETRIEVAL", 0.10),
-    "cf": _env_float("SCORING_WEIGHT_CF", 0.25),
-    "category": _env_float("SCORING_WEIGHT_CATEGORY", 0.10),
+    "semantic": _env_float("SCORING_WEIGHT_SEMANTIC", 0.25),
+    "retrieval": _env_float("SCORING_WEIGHT_RETRIEVAL", 0.20),
+    "cf": _env_float("SCORING_WEIGHT_CF", 0.20),
+    "category": _env_float("SCORING_WEIGHT_CATEGORY", 0.25),
     "time_fit": _env_float("SCORING_WEIGHT_TIME_FIT", 0.05),
-    "freshness": _env_float("SCORING_WEIGHT_FRESHNESS", 0.05),
-    "trust": _env_float("SCORING_WEIGHT_TRUST", 0.05),
+    "freshness": _env_float("SCORING_WEIGHT_FRESHNESS", 0.03),
+    "trust": _env_float("SCORING_WEIGHT_TRUST", 0.02),
 }
 
 TIME_BALANCE_THRESHOLDS = {
