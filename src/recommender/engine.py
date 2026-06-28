@@ -91,38 +91,31 @@ def _cold_start_candidates(user, eligible_df, existing_ids, needed):
 
 
 
-
 def _retrieve_candidates(user, user_vectors, eligible_df, system_data):
-    needs_scores = faiss_search(
-        system_data["index"],
-        system_data["post_ids"],
-        user_vectors["consumer"],
-        top_k=FAISS_TOP_K,
-    )
-    
-    skills_scores = faiss_search(
-        system_data["index"],
-        system_data["post_ids"],
-        user_vectors["provider"],
-        top_k=FAISS_TOP_K,
-    )
-
     posts_by_id = system_data["posts_by_id"]
-    retrieval_raw = {}
+    index = system_data["index"]
+    post_ids = system_data["post_ids"]
+    
+    raw_scores = {}
 
-    for post_id, score in needs_scores.items():
-        if post_id in posts_by_id.index and is_offer_post(posts_by_id.loc[post_id]["post_type"]):
-            retrieval_raw[post_id] = score
+    for need in user.get("needs", []):
+        vec = build_weighted_embedding((need,))
+        scores = faiss_search(index, post_ids, vec, top_k=20) 
+        
+        for pid, score in scores.items():
+            if pid in posts_by_id.index and is_offer_post(posts_by_id.loc[pid]["post_type"]):
+                raw_scores[pid] = max(raw_scores.get(pid, 0.0), score)
 
-    for post_id, score in skills_scores.items():
-        if post_id in posts_by_id.index and not is_offer_post(posts_by_id.loc[post_id]["post_type"]):
-            retrieval_raw[post_id] = max(retrieval_raw.get(post_id, 0.0), score)
+    for skill in user.get("skills", []):
+        vec = build_weighted_embedding((skill,))
+        scores = faiss_search(index, post_ids, vec, top_k=20)
+        
+        for pid, score in scores.items():
+            if pid in posts_by_id.index and not is_offer_post(posts_by_id.loc[pid]["post_type"]):
+                raw_scores[pid] = max(raw_scores.get(pid, 0.0), score)
 
     eligible_ids = set(eligible_df["post_id"].tolist())
-    retrieval_raw = {k: v for k, v in retrieval_raw.items() if k in eligible_ids}
-
-    if is_zero_vector(user_vectors["consumer"]) and is_zero_vector(user_vectors["provider"]):
-        retrieval_raw = {}
+    retrieval_raw = {k: v for k, v in raw_scores.items() if k in eligible_ids}
 
     if len(retrieval_raw) < MIN_CANDIDATES:
         needed = MIN_CANDIDATES - len(retrieval_raw)
