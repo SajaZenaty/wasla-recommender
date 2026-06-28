@@ -14,7 +14,7 @@ from src.features.embeddings import (
 )
 from src.recommender.retrieval import (
     build_faiss_index,
-    dual_faiss_search,
+    faiss_search,
     normalize_retrieval_scores,
 )
 from src.ranking.collaborative import (
@@ -23,7 +23,7 @@ from src.ranking.collaborative import (
     compute_cf_scores,
 )
 from src.ranking.scoring import compute_hybrid_score, compute_similarity
-from src.data.preprocessing import ensure_users_schema, preprocess_users
+from src.data.preprocessing import ensure_users_schema, is_offer_post, preprocess_users
 from src.utils.ids import lookup_in_mapping
 
 
@@ -91,13 +91,27 @@ def _cold_start_candidates(user, eligible_df, existing_ids, needed):
 
 
 def _retrieve_candidates(user, user_vectors, eligible_df, system_data):
-    retrieval_raw = dual_faiss_search(
+    needs_scores = faiss_search(
         system_data["index"],
         system_data["post_ids"],
         user_vectors["consumer"],
+        top_k=FAISS_TOP_K,
+    )
+    skills_scores = faiss_search(
+        system_data["index"],
+        system_data["post_ids"],
         user_vectors["provider"],
         top_k=FAISS_TOP_K,
     )
+
+    posts_by_id = system_data["posts_by_id"]
+    retrieval_raw = {}
+    for post_id, score in needs_scores.items():
+        if is_offer_post(posts_by_id.loc[post_id]["post_type"]):
+            retrieval_raw[post_id] = score
+    for post_id, score in skills_scores.items():
+        if not is_offer_post(posts_by_id.loc[post_id]["post_type"]):
+            retrieval_raw[post_id] = max(retrieval_raw.get(post_id, 0.0), score)
 
     eligible_ids = set(eligible_df["post_id"].tolist())
     retrieval_raw = {k: v for k, v in retrieval_raw.items() if k in eligible_ids}

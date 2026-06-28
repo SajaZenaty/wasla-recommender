@@ -10,6 +10,7 @@ from src.settings import (
     EMBEDDING_MODEL_NAME,
     LAMBDA_DECAY,
 )
+from src.data.preprocessing import is_offer_post
 from src.utils.ids import filter_by_id, lookup_in_mapping
 
 
@@ -36,7 +37,7 @@ def get_user_vector(user_vectors, post):
     while a request ("طلب") is matched against what the user can provide
     (provider side). This mirrors the category logic in scoring.compute_similarity.
     """
-    if post.get("post_type") == "offer":
+    if is_offer_post(post.get("post_type")):
         return user_vectors["consumer"]
     return user_vectors["provider"]
 

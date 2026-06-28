@@ -7,6 +7,7 @@ user across a few seeds and report simple aggregate quality signals.
 import numpy as np
 
 from src.data.loader import load_mock_data
+from src.data.preprocessing import is_offer_post
 from src.recommender.engine import bootstrap_system_data, recommend
 
 
@@ -14,7 +15,7 @@ def _category_hit(user, row):
     needs = {str(n).lower().strip() for n in user.get("needs", [])}
     skills = {str(s).lower().strip() for s in user.get("skills", [])}
     category = str(row.get("category", "")).lower().strip()
-    if row.get("post_type") == "عرض":
+    if is_offer_post(row.get("post_type")):
         return category in needs
     return category in skills
 
