@@ -185,7 +185,7 @@ def recommend(user, posts_df, interactions_df, system_data, top_k=10):
     return df_results.head(top_k).reset_index()
 
 
-def apply_diversity(results, similarity_matrix, post_id_to_idx, lambda_param=0.5):
+def apply_diversity(results, similarity_matrix, post_id_to_idx, lambda_param=0.4):
     if len(results) < 2:
         return results
 
