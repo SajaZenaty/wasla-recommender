@@ -90,6 +90,8 @@ def _cold_start_candidates(user, eligible_df, existing_ids, needed):
     return extras
 
 
+
+
 def _retrieve_candidates(user, user_vectors, eligible_df, system_data):
     needs_scores = faiss_search(
         system_data["index"],
@@ -97,6 +99,7 @@ def _retrieve_candidates(user, user_vectors, eligible_df, system_data):
         user_vectors["consumer"],
         top_k=FAISS_TOP_K,
     )
+    
     skills_scores = faiss_search(
         system_data["index"],
         system_data["post_ids"],
@@ -106,11 +109,13 @@ def _retrieve_candidates(user, user_vectors, eligible_df, system_data):
 
     posts_by_id = system_data["posts_by_id"]
     retrieval_raw = {}
+
     for post_id, score in needs_scores.items():
-        if is_offer_post(posts_by_id.loc[post_id]["post_type"]):
+        if post_id in posts_by_id.index and is_offer_post(posts_by_id.loc[post_id]["post_type"]):
             retrieval_raw[post_id] = score
+
     for post_id, score in skills_scores.items():
-        if not is_offer_post(posts_by_id.loc[post_id]["post_type"]):
+        if post_id in posts_by_id.index and not is_offer_post(posts_by_id.loc[post_id]["post_type"]):
             retrieval_raw[post_id] = max(retrieval_raw.get(post_id, 0.0), score)
 
     eligible_ids = set(eligible_df["post_id"].tolist())
